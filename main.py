@@ -1,6 +1,7 @@
 import random
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 CONST_SENHA_WIFI_CARACTERES = 8
 CONST_SENHAS_TENTADAS = set()  # Usando um conjunto para evitar duplicatas e melhorar a busca
@@ -37,26 +38,19 @@ def main():
     senha = gerar_senha_wifi()  # Gera a senha alvo
     print(f"Senha original: {senha}")
 
-    threads = []
     num_threads = 4  # Número de threads que queremos usar
     tentativas_por_thread = [0] * num_threads  # Contador de tentativas por thread
 
-    # Criar threads
-    for i in range(num_threads):
-        thread = threading.Thread(target=password_cracker, args=(senha, i, tentativas_por_thread))
-        threads.append(thread)
-        thread.start()
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = [executor.submit(password_cracker, senha, i, tentativas_por_thread) for i in range(num_threads)]
 
-    # Exibir progresso
-    while not senha_encontrada.is_set():
-        with LOCK:
-            print("\nProgresso das threads:")
-            for thread_id, tentativas in enumerate(tentativas_por_thread):
-                print(f"[Thread-{thread_id}] Tentativas: {tentativas}")
-
-    # Aguardar todas as threads terminarem
-    for thread in threads:
-        thread.join()
+        # Exibir progresso
+        while not senha_encontrada.is_set():
+            with LOCK:
+                print("\nProgresso das threads:")
+                for thread_id, tentativas in enumerate(tentativas_por_thread):
+                    print(f"[Thread-{thread_id}] Tentativas: {tentativas}")
+            time.sleep(1)  # Espera 1 segundo antes de verificar novamente
 
     print("\nFinalizado! Estatísticas de tentativas:")
     for thread_id, tentativas in enumerate(tentativas_por_thread):
